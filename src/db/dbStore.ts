@@ -176,6 +176,49 @@ function getInitialData(): DatabaseSchema {
     results: []
   };
 
+  const seedExamDemo: Exam = {
+    _id: 'exam_demo',
+    departmentId: 'dept_cs',
+    courseName: 'تجربة منصة الامتحانات الرقمية',
+    title: 'الاختبار التجريبي الموحد (نظام المراقبة الذكية)',
+    date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days from now
+    time: '12:00',
+    duration: 30,
+    maxScore: 100,
+    questions: [
+      {
+        id: 'q_demo_1',
+        type: 'mcq',
+        questionText: 'أي خوارزمية مما يلي تعد الأسرع لترتيب مصفوفة عشوائية في الحالة المتوسطة؟',
+        options: [
+          'ترتيب الفقاعة (Bubble Sort)',
+          'الترتيب السريع (Quick Sort)',
+          'ترتيب الاختيار (Selection Sort)',
+          'لا شيء مما ذكر'
+        ],
+        correctAnswer: 'الترتيب السريع (Quick Sort)'
+      },
+      {
+        id: 'q_demo_2',
+        type: 'mcq',
+        questionText: 'ما هي ميزة الاستدعاء الذاتي (Recursion) في كتابة الشفرات البرمجية؟',
+        options: [
+          'تقليص حجم الذاكرة المستخدمة دائماً',
+          'جعل الكود أكثر وضوحاً وسهولة في الفهم لبعض المسائل المعقدة',
+          'تسريع التنفيذ مقارنة بالحلقات التكرارية دائماً',
+          'زيادة كفاءة المعالج تلقائياً'
+        ],
+        correctAnswer: 'جعل الكود أكثر وضوحاً وسهولة في الفهم لبعض المسائل المعقدة'
+      },
+      {
+        id: 'q_demo_3',
+        type: 'essay',
+        questionText: 'ما هي برأيك فائدة نظام المراقبة الذكي بالذكاء الاصطناعي وكيف يساهم في ضمان تكافؤ الفرص بين الطلاب؟'
+      }
+    ],
+    results: []
+  };
+
   const seedFee: Fee = {
     _id: 'fee_1',
     studentId: 'student_1',
@@ -201,7 +244,7 @@ function getInitialData(): DatabaseSchema {
     departments: DEFAULT_DEPARTMENTS,
     lectures: [seedLecture],
     assignments: [seedAssignment],
-    exams: [seedExam],
+    exams: [seedExam, seedExamDemo],
     fees: [seedFee],
     notifications: [seedNotification],
     complaints: []

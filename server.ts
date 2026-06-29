@@ -272,7 +272,8 @@ app.post('/api/auth/first-time-setup', (req: Request, res: Response) => {
 
 app.get('/api/auth/github/url', (req: Request, res: Response) => {
   const clientId = process.env.GITHUB_CLIENT_ID || 'dummy_client_id';
-  const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const redirectUri = `${protocol}://${req.get('host')}/auth/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
   res.json({ url });
 });
