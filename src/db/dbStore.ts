@@ -15,8 +15,6 @@ import {
   Complaint
 } from '../types.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const DB_FILE_PATH = path.join(process.cwd(), 'db.json');
 
 // Lazy initialization of Supabase client to prevent boot errors if credentials are not yet set

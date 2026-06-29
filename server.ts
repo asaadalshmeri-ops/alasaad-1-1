@@ -9,7 +9,7 @@ import { User, Student, Department, Lecture, Assignment, Exam, Fee, Notification
 import { GoogleGenAI } from '@google/genai';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-lms-jwt-token-key-2026';
 
 // Initialize Gemini AI client
