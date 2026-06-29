@@ -1,0 +1,11 @@
+{
+  "name": "Remix: EduStream Pro LMS",
+  "description": "Comprehensive MERN LMS featuring proctored exams, student profiles, lecture tracking, assignments, and integrated fee management for educational institutions.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
