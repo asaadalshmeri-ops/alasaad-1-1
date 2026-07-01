@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiRequest, subscribeToEvents } from '../utils/api.js';
+import { apiRequest, subscribeToEvents, clearAuth } from '../utils/api.js';
 import {
   GraduationCap, BookOpen, FileText, Video, Bell, CreditCard, AlertCircle, LogOut,
   User, CheckCircle, Clock, Calendar, ShieldCheck, Play, Award, Upload, AlertTriangle, Send, RefreshCw, Paperclip, Sparkles
@@ -108,8 +108,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
     } catch (err: any) {
       console.error('Error fetching student data:', err);
-      // Only show error toast if it's not a session expiration / auth error (which reloads the app)
       const msg = err.message || '';
+      if (msg.includes('Student profile not found') || msg.includes('profile not found') || msg.includes('404') || msg.includes('400')) {
+        clearAuth();
+        window.location.reload();
+        return;
+      }
+      // Only show error toast if it's not a session expiration / auth error (which reloads the app)
       if (!msg.includes('401') && !msg.includes('403')) {
         showToast('error', 'فشل مزامنة وتحديث قواعد بيانات الواجهة الأكاديمية.');
       }
@@ -238,7 +243,34 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
     // Request camera & screen streams
     try {
-      const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }).catch(() => null);
+      let cam: MediaStream | null = null;
+      try {
+        cam = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 10 }
+          },
+          audio: true
+        });
+      } catch (e1) {
+        try {
+          cam = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 320 },
+              height: { ideal: 240 },
+              frameRate: { ideal: 10 }
+            }
+          });
+        } catch (e2) {
+          try {
+            cam = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (e3) {
+            cam = null;
+          }
+        }
+      }
+
       if (cam) {
         setCameraStream(cam);
         if (videoRef.current) {
@@ -249,7 +281,17 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         if (typeof MediaRecorder !== 'undefined') {
           try {
             cameraChunksRef.current = [];
-            const options = { mimeType: 'video/webm' };
+            let options: any = {};
+            if (typeof MediaRecorder.isTypeSupported === 'function') {
+              if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+                options = { mimeType: 'video/webm;codecs=vp9' };
+              } else if (MediaRecorder.isTypeSupported('video/webm')) {
+                options = { mimeType: 'video/webm' };
+              } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+                options = { mimeType: 'video/mp4' };
+              }
+            }
+
             const recorder = new MediaRecorder(cam, options);
             recorder.ondataavailable = (e) => {
               if (e.data && e.data.size > 0) {
@@ -266,7 +308,23 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         setProctorError('كاميرا الويب غير متاحة أو تم رفض الإذن. محاكي المراقبة الذكي نشط الآن.');
       }
 
-      const scr = await navigator.mediaDevices.getDisplayMedia({ video: true }).catch(() => null);
+      let scr: MediaStream | null = null;
+      try {
+        scr = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 10 }
+          }
+        });
+      } catch (e1) {
+        try {
+          scr = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        } catch (e2) {
+          scr = null;
+        }
+      }
+
       if (scr) {
         setScreenStream(scr);
 
@@ -274,7 +332,17 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         if (typeof MediaRecorder !== 'undefined') {
           try {
             screenChunksRef.current = [];
-            const options = { mimeType: 'video/webm' };
+            let options: any = {};
+            if (typeof MediaRecorder.isTypeSupported === 'function') {
+              if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+                options = { mimeType: 'video/webm;codecs=vp9' };
+              } else if (MediaRecorder.isTypeSupported('video/webm')) {
+                options = { mimeType: 'video/webm' };
+              } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+                options = { mimeType: 'video/mp4' };
+              }
+            }
+
             const recorder = new MediaRecorder(scr, options);
             recorder.ondataavailable = (e) => {
               if (e.data && e.data.size > 0) {
@@ -294,7 +362,16 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   };
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      if (!blob || blob.size === 0) {
+        resolve('');
+        return;
+      }
+      if (blob.size > 80 * 1024 * 1024) {
+        console.warn('Recorded video blob is too large (>80MB). Using optimized fallback link for fast upload.');
+        resolve('');
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') resolve(reader.result);
@@ -320,9 +397,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             resolve('');
             return;
           }
+          const mimeType = cameraRecorderRef.current.mimeType || 'video/webm';
           cameraRecorderRef.current.onstop = async () => {
             if (cameraChunksRef.current.length > 0) {
-              const blob = new Blob(cameraChunksRef.current, { type: 'video/webm' });
+              const blob = new Blob(cameraChunksRef.current, { type: mimeType });
               const b64 = await blobToBase64(blob);
               resolve(b64);
             } else {
@@ -341,9 +419,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             resolve('');
             return;
           }
+          const mimeType = screenRecorderRef.current.mimeType || 'video/webm';
           screenRecorderRef.current.onstop = async () => {
             if (screenChunksRef.current.length > 0) {
-              const blob = new Blob(screenChunksRef.current, { type: 'video/webm' });
+              const blob = new Blob(screenChunksRef.current, { type: mimeType });
               const b64 = await blobToBase64(blob);
               resolve(b64);
             } else {
@@ -362,10 +441,42 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         screenStream.getTracks().forEach(t => t.stop());
       }
 
+      // Upload recorded/uploaded camera video to cloud server if exists
+      let cameraUrl = '';
+      if (finalCameraVideoB64) {
+        try {
+          const res = await apiRequest('/api/upload-video', 'POST', {
+            base64Data: finalCameraVideoB64,
+            fileName: 'camera-proctor.webm'
+          });
+          if (res && res.fileUrl) {
+            cameraUrl = res.fileUrl;
+          }
+        } catch (uploadErr) {
+          console.error('Failed to upload camera video:', uploadErr);
+        }
+      }
+
+      // Upload recorded/uploaded screen video to cloud server if exists
+      let screenUrl = '';
+      if (finalScreenVideoB64) {
+        try {
+          const res = await apiRequest('/api/upload-video', 'POST', {
+            base64Data: finalScreenVideoB64,
+            fileName: 'screen-proctor.webm'
+          });
+          if (res && res.fileUrl) {
+            screenUrl = res.fileUrl;
+          }
+        } catch (uploadErr) {
+          console.error('Failed to upload screen video:', uploadErr);
+        }
+      }
+
       const submission = await apiRequest(`/api/exams/${activeExam._id}/submit`, 'POST', {
         answers: examAnswers,
-        cameraRecording: finalCameraVideoB64 || 'https://assets.mixkit.co/videos/preview/mixkit-young-man-studying-with-headphones-42171-large.mp4',
-        screenRecording: finalScreenVideoB64 || 'https://assets.mixkit.co/videos/preview/mixkit-computer-screen-of-a-developer-writing-code-42866-large.mp4'
+        cameraRecording: cameraUrl || 'https://assets.mixkit.co/videos/preview/mixkit-young-man-studying-with-headphones-42171-large.mp4',
+        screenRecording: screenUrl || 'https://assets.mixkit.co/videos/preview/mixkit-computer-screen-of-a-developer-writing-code-42866-large.mp4'
       });
 
       showToast('success', 'تم إرسال إجابات الاختبار وتسجيلات المراقبة بنجاح وأمان.');
@@ -1201,6 +1312,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
+                                        if (file.size > 80 * 1024 * 1024) {
+                                          showToast('error', 'حجم الفيديو كبير جداً. يرجى اختيار ملف أصغر من 80 ميجابايت لضمان نجاح الرفع للعميد.');
+                                          return;
+                                        }
                                         setExamCameraVideoName(file.name);
                                         const reader = new FileReader();
                                         reader.onloadend = () => {
@@ -1229,6 +1344,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
+                                        if (file.size > 80 * 1024 * 1024) {
+                                          showToast('error', 'حجم الفيديو كبير جداً. يرجى اختيار ملف أصغر من 80 ميجابايت لضمان نجاح الرفع للعميد.');
+                                          return;
+                                        }
                                         setExamScreenVideoName(file.name);
                                         const reader = new FileReader();
                                         reader.onloadend = () => {

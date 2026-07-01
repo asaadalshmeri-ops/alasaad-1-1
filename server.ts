@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
@@ -25,6 +26,13 @@ const ai = new GoogleGenAI({
 // Body size limit increased to handle base64 files (photos, documents, recordings)
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+// Serve static uploads
+const uploadsPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsPath));
 
 // SSE Connections list for real-time synchronization
 interface SSEClient {
@@ -602,13 +610,13 @@ app.post('/api/admin/students', authenticateToken, requireRole('admin'), (req: A
 // Student Profile API (for students to view their own profile)
 app.get('/api/students/profile', authenticateToken, requireRole('student'), (req: AuthenticatedRequest, res: Response) => {
   if (!req.user || !req.user.studentId) {
-    res.status(400).json({ error: 'Student ID not found in session' });
+    res.status(401).json({ error: 'Student ID not found in session' });
     return;
   }
   const students = dbStore.getStudents();
   const student = students.find(s => s._id === req.user!.studentId);
   if (!student) {
-    res.status(404).json({ error: 'Student profile not found' });
+    res.status(401).json({ error: 'Student profile not found' });
     return;
   }
   res.json(student);
@@ -972,6 +980,11 @@ app.post('/api/assignments/:id/grade', authenticateToken, requireRole('admin'), 
 
 // --- EXAMS API ---
 
+// List all exams globally for admin proctoring dashboard
+app.get('/api/admin/exams', authenticateToken, requireRole('admin'), (req: Request, res: Response) => {
+  res.json(dbStore.getExams());
+});
+
 // List department exams
 app.get('/api/departments/:deptId/exams', authenticateToken, (req: Request, res: Response) => {
   let exams = dbStore.getExams().filter(e => e.departmentId === req.params.deptId);
@@ -1090,6 +1103,37 @@ app.post('/api/exams/:id/submit', authenticateToken, requireRole('student'), (re
     message: 'Exam submitted successfully and recordings uploaded.',
     autoScore: mcqCount > 0 ? `${mcqScore}/${mcqCount} MCQs correct` : 'No MCQs'
   });
+});
+
+// Upload base64 video recording to local cloud server
+app.post('/api/upload-video', authenticateToken, (req: Request, res: Response) => {
+  const { base64Data, fileName } = req.body;
+  if (!base64Data) {
+    res.status(400).json({ error: 'No video data provided' });
+    return;
+  }
+  try {
+    // Extract base64 content
+    const base64Content = base64Data.replace(/^data:video\/[^;]+;base64,/, "");
+    const buffer = Buffer.from(base64Content, 'base64');
+    
+    const uploadsPath = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsPath)) {
+      fs.mkdirSync(uploadsPath, { recursive: true });
+    }
+    
+    const fileExt = fileName ? path.extname(fileName) : '.webm';
+    const safeName = `video-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${fileExt}`;
+    const filePath = path.join(uploadsPath, safeName);
+    
+    fs.writeFileSync(filePath, buffer);
+    
+    const fileUrl = `/uploads/${safeName}`;
+    res.json({ success: true, fileUrl });
+  } catch (error: any) {
+    console.error('Failed to save uploaded video:', error);
+    res.status(500).json({ error: 'Failed to save video on server' });
+  }
 });
 
 // Grade essay questions
@@ -1450,14 +1494,19 @@ async function startServer() {
     console.error('[LMS SERVER] Failed to sync with Supabase during boot:', err);
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
+  const isProduction = process.env.NODE_ENV === 'production' || (hasDist && process.env.NODE_ENV !== 'development');
+
+  if (!isProduction) {
+    console.log('[LMS SERVER] Starting Vite in middleware mode for development...');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    console.log(`[LMS SERVER] Serving static files from ${distPath}...`);
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

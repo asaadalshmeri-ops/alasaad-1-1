@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { apiRequest, setAuthToken, setSavedUser } from '../utils/api.js';
-import { GraduationCap, Lock, User, Key, Eye, EyeOff, ShieldAlert, Check, Github } from 'lucide-react';
+import { GraduationCap, Lock, User, Key, Eye, EyeOff, ShieldAlert, Check } from 'lucide-react';
 
 interface LoginProps {
   onLoginSuccess: (user: any) => void;
@@ -21,58 +21,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  React.useEffect(() => {
-    const handleOAuthMessage = (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-        return;
-      }
-      
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const { token, user } = event.data;
-        if (token && user) {
-          setAuthToken(token);
-          setSavedUser(user);
-          onLoginSuccess(user);
-        } else {
-          setError('فشل استلام بيانات المصادقة من GitHub.');
-        }
-        setLoading(false);
-      }
-    };
-    
-    window.addEventListener('message', handleOAuthMessage);
-    return () => window.removeEventListener('message', handleOAuthMessage);
-  }, [onLoginSuccess]);
 
-  const handleGithubLogin = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await apiRequest('/api/auth/github/url');
-      if (!res.url) {
-        throw new Error('فشل جلب رابط مصادقة GitHub.');
-      }
-      
-      const width = 600;
-      const height = 650;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      const popup = window.open(
-        res.url,
-        'github_oauth_popup',
-        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
-      );
-      
-      if (!popup) {
-        throw new Error('تم حظر النافذة المنبثقة من قبل المتصفح. يرجى السماح بالنوافذ المنبثقة لإتمام ربط الحساب.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'فشل الاتصال بـ GitHub.');
-      setLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,24 +208,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
               </button>
 
-              <div className="relative my-5">
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div className="w-full border-t border-[#cbd5e1]/60"></div>
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-[#eef2f6] px-3 text-[#64748b] font-bold">أو الربط الأكاديمي المباشر</span>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={handleGithubLogin}
-                disabled={loading}
-                className="w-full bg-[#24292e] hover:bg-[#2f363d] active:scale-[0.99] text-white py-3 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Github className="h-4.5 w-4.5" />
-                <span>ربط الحساب وتسجيل الدخول بواسطة GitHub</span>
-              </button>
             </form>
           ) : (
             /* FIRST TIME PASSWORD SETUP */

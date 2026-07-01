@@ -275,19 +275,6 @@ export class DBStore {
           notifications: parsed.notifications || [],
           complaints: parsed.complaints || []
         };
-        // Reset password hashes of all students to enable first-time registration from scratch
-        let adjusted = false;
-        this.data.users = this.data.users.map(u => {
-          if (u.role === 'student' && u.passwordHash !== '') {
-            adjusted = true;
-            return { ...u, passwordHash: '' };
-          }
-          return u;
-        });
-        if (adjusted) {
-          console.log('[DB] Restored student accounts for first-time setup.');
-          this.saveLocallyOnly();
-        }
       } else {
         this.saveLocallyOnly();
       }

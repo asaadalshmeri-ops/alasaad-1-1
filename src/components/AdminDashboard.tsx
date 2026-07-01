@@ -3,7 +3,7 @@ import { apiRequest, subscribeToEvents } from '../utils/api.js';
 import {
   GraduationCap, Users, BookOpen, FileText, Video, Bell, CreditCard, AlertCircle, LogOut,
   UserPlus, Search, Edit, Trash, Plus, Check, CheckCircle, Clock, Calendar, ShieldAlert,
-  Paperclip, ArrowRight, Eye, Upload, RefreshCw, Award, Play, Database, Sparkles
+  Paperclip, ArrowRight, Eye, Upload, RefreshCw, Award, Play, Database, Sparkles, Download
 } from 'lucide-react';
 import { Student, Lecture, Assignment, Exam, Fee, Notification, Complaint, Department } from '../types.js';
 
@@ -21,6 +21,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [fees, setFees] = useState<Fee[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [allExamsList, setAllExamsList] = useState<Exam[]>([]);
+  const [announcementsSubTab, setAnnouncementsSubTab] = useState<'news' | 'proctoring'>('news');
+  const [openProctorVideoId, setOpenProctorVideoId] = useState<string | null>(null);
   
   // Supabase Sync States
   const [supabaseStatus, setSupabaseStatus] = useState<any>(null);
@@ -143,6 +146,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
       const notifsList = await apiRequest('/api/notifications');
       setNotifications(notifsList);
+
+      const globalExams = await apiRequest('/api/admin/exams');
+      setAllExamsList(globalExams || []);
 
       if (selectedDept) {
         await fetchDeptData(selectedDept._id);
@@ -528,7 +534,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 }`}
               >
                 <Bell className="h-4.5 w-4.5 text-indigo-400 shrink-0" />
-                <span>التعميمات والإعلانات</span>
+                <span>الأخبار والمراقبة</span>
               </button>
 
               <button
@@ -1265,96 +1271,330 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
               )}
 
-              {/* === ANNOUNCEMENTS TAB === */}
+              {/* === ANNOUNCEMENTS & PROCTORING TAB === */}
               {activeTab === 'announcements' && (
                 <div className="space-y-6">
-                  <div className="p-6 bg-[#152230] text-white rounded-2xl flex items-center gap-4 border border-[#2d3e52]">
-                    <div className="p-3 bg-indigo-500/10 rounded-xl">
-                      <Bell className="h-8 w-8 text-indigo-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-extrabold">نشر وتعميم الإعلانات والقرارات الأكاديمية</h2>
-                      <p className="text-xs text-[#8ea0b4] mt-1">قم بنشر إعلانات شاملة لكل طلاب الأكاديمية، أو حدّد قسماً معنياً لتظهر هذه التنبيهات في لوحة القيادة الخاصة بهم فورياً.</p>
-                    </div>
+                  {/* Tab Selector buttons */}
+                  <div className="flex bg-[#121d28] p-1.5 rounded-2xl border border-[#2d3e52]/60 gap-2">
+                    <button
+                      onClick={() => setAnnouncementsSubTab('news')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        announcementsSubTab === 'news'
+                          ? 'bg-indigo-600 text-white shadow-lg'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Bell className="h-4.5 w-4.5" />
+                      <span>الأخبار والتعميمات الإدارية</span>
+                    </button>
+                    <button
+                      onClick={() => setAnnouncementsSubTab('proctoring')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        announcementsSubTab === 'proctoring'
+                          ? 'bg-indigo-600 text-white shadow-lg'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Video className="h-4.5 w-4.5" />
+                      <span>جلسات المراقبة وتدفق الفيديو السحابي</span>
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Announcement form */}
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 text-right">
-                      <h3 className="text-sm font-extrabold text-[#101923] mb-4 border-b border-slate-100 pb-2">صياغة إعلان جديد</h3>
-                      <form onSubmit={handleCreateAnnouncement} className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5">القسم المستهدف بالإعلان</label>
-                          <select
-                            value={announcementForm.departmentId || ''}
-                            onChange={(e) => setAnnouncementForm(prev => ({ ...prev, departmentId: e.target.value ? e.target.value : null }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500 font-bold"
-                          >
-                            <option value="">عام (كامل طلاب الأكاديمية)</option>
-                            {departments.map(d => (
-                              <option key={d._id} value={d._id}>{d.name}</option>
-                            ))}
-                          </select>
+                  {announcementsSubTab === 'news' ? (
+                    <>
+                      <div className="p-6 bg-[#152230] text-white rounded-2xl flex items-center gap-4 border border-[#2d3e52]">
+                        <div className="p-3 bg-indigo-500/10 rounded-xl">
+                          <Bell className="h-8 w-8 text-indigo-400" />
                         </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5">عنوان التعميم</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="مثال: موعد بدء اختبارات الكلية النهائية"
-                            value={announcementForm.title || ''}
-                            onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500"
-                          />
+                        <div className="text-right">
+                          <h2 className="text-lg font-extrabold">نشر وتعميم الإعلانات والقرارات الأكاديمية</h2>
+                          <p className="text-xs text-[#8ea0b4] mt-1">قم بنشر إعلانات شاملة لكل طلاب الأكاديمية، أو حدّد قسماً معنياً لتظهر هذه التنبيهات في لوحة القيادة الخاصة بهم فورياً.</p>
                         </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5">تفاصيل ومحتوى الإعلان</label>
-                          <textarea
-                            rows={5}
-                            required
-                            placeholder="اكتب كامل نص التنبيه أو القرار هنا..."
-                            value={announcementForm.message || ''}
-                            onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500 leading-relaxed"
-                          />
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="w-full bg-[#101923] hover:bg-[#1a2c3f] text-white py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                        >
-                          <Bell className="h-4 w-4" />
-                          <span>نشر وتعميم الإعلان للطلاب</span>
-                        </button>
-                      </form>
-                    </div>
-
-                    {/* Published list */}
-                    <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 text-right">
-                      <h3 className="text-sm font-extrabold text-[#101923] mb-4 border-b border-slate-100 pb-2">سجل الإعلانات والتعميمات الحالية</h3>
-                      <div className="space-y-4">
-                        {notifications.map((notif) => {
-                          const targetDept = departments.find(d => d._id === notif.departmentId);
-                          return (
-                            <div key={notif._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1 font-medium">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h4 className="text-sm font-extrabold text-[#101923]">{notif.title}</h4>
-                                  <span className="text-[9px] text-slate-400 font-mono block mt-0.5">الجهة المستهدفة: {targetDept ? targetDept.name : 'عام (الجميع)'} | تاريخ النشر: {new Date(notif.createdAt).toLocaleDateString('ar-EG')}</span>
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-600 leading-relaxed font-semibold">{notif.message}</p>
-                            </div>
-                          );
-                        })}
-                        {notifications.length === 0 && (
-                          <p className="text-xs text-slate-400 py-10 text-center font-bold">لم يتم نشر أي إعلانات تعميمية سابقاً.</p>
-                        )}
                       </div>
-                    </div>
-                  </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Announcement form */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-6 text-right">
+                          <h3 className="text-sm font-extrabold text-[#101923] mb-4 border-b border-slate-100 pb-2">صياغة إعلان جديد</h3>
+                          <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">القسم المستهدف بالإعلان</label>
+                              <select
+                                value={announcementForm.departmentId || ''}
+                                onChange={(e) => setAnnouncementForm(prev => ({ ...prev, departmentId: e.target.value ? e.target.value : null }))}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500 font-bold"
+                              >
+                                <option value="">عام (كامل طلاب الأكاديمية)</option>
+                                {departments.map(d => (
+                                  <option key={d._id} value={d._id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">عنوان التعميم</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="مثال: موعد بدء اختبارات الكلية النهائية"
+                                value={announcementForm.title || ''}
+                                onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">تفاصيل ومحتوى الإعلان</label>
+                              <textarea
+                                rows={5}
+                                required
+                                placeholder="اكتب كامل نص التنبيه أو القرار هنا..."
+                                value={announcementForm.message || ''}
+                                onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#1e293b] focus:outline-none focus:border-indigo-500 leading-relaxed"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="w-full bg-[#101923] hover:bg-[#1a2c3f] text-white py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              <Bell className="h-4 w-4" />
+                              <span>نشر وتعميم الإعلان للطلاب</span>
+                            </button>
+                          </form>
+                        </div>
+
+                        {/* Published list */}
+                        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 text-right">
+                          <h3 className="text-sm font-extrabold text-[#101923] mb-4 border-b border-slate-100 pb-2">سجل الإعلانات والتعميمات الحالية</h3>
+                          <div className="space-y-4">
+                            {notifications.map((notif) => {
+                              const targetDept = departments.find(d => d._id === notif.departmentId);
+                              return (
+                                <div key={notif._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1 font-medium">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="text-sm font-extrabold text-[#101923]">{notif.title}</h4>
+                                      <span className="text-[9px] text-slate-400 font-mono block mt-0.5">الجهة المستهدفة: {targetDept ? targetDept.name : 'عام (الجميع)'} | تاريخ النشر: {new Date(notif.createdAt).toLocaleDateString('ar-EG')}</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-slate-600 leading-relaxed font-semibold">{notif.message}</p>
+                                </div>
+                              );
+                            })}
+                            {notifications.length === 0 && (
+                              <p className="text-xs text-slate-400 py-10 text-center font-bold">لم يتم نشر أي إعلانات تعميمية سابقاً.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* PROCTORING SUB-TAB VIEW */}
+                      <div className="p-6 bg-[#0f1d2c] text-white rounded-2xl flex items-center gap-4 border border-emerald-500/20 shadow-md">
+                        <div className="p-3 bg-emerald-500/10 rounded-xl">
+                          <Video className="h-8 w-8 text-emerald-400" />
+                        </div>
+                        <div className="text-right flex-1">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-extrabold">منصة المراقبة السحابية وغرفة التحكم الذكية</h2>
+                            <span className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[9px] px-2.5 py-1 rounded-full font-black animate-pulse">
+                              بث سحابي نشط ☁️
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#8ea0b4] mt-1">
+                            شاهد جلسات المراقبة المسجلة وبث كاميرا الويب ومشاركة الشاشة المرفوعة من قبل الطلاب لجميع أقسام الأكاديمية.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-2xl p-6 text-right">
+                        <h3 className="text-sm font-extrabold text-[#101923] mb-4 border-b border-slate-100 pb-2 flex items-center gap-2 justify-start">
+                          <Video className="h-4 w-4 text-indigo-500" />
+                          <span>جلسات وتوثيق المراقبة للاختبارات السحابية</span>
+                        </h3>
+
+                        <div className="space-y-4">
+                          {(() => {
+                            const proctoringItems: Array<{
+                              exam: Exam;
+                              student: Student;
+                              sub: any;
+                            }> = [];
+
+                            allExamsList.forEach(exam => {
+                              const subs = exam.results || exam.submissions || [];
+                              subs.forEach(sub => {
+                                const student = students.find(s => s._id === sub.studentId);
+                                if (student) {
+                                  proctoringItems.push({ exam, student, sub });
+                                }
+                              });
+                            });
+
+                            if (proctoringItems.length === 0) {
+                              return (
+                                <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                  <Video className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                                  <p className="text-xs text-slate-500 font-extrabold">لا توجد جلسات اختبار أو تسجيلات مراقبة مرفوعة حالياً.</p>
+                                  <p className="text-[10px] text-slate-400 mt-1">ستظهر هنا تسجيلات الطلاب بمجرد بدء وإرسال اختباراتهم الرقمية.</p>
+                                </div>
+                              );
+                            }
+
+                            return proctoringItems.map(({ exam, student, sub }) => {
+                              const uniqueId = `${exam._id}_${student._id}`;
+                              const isExpanded = openProctorVideoId === uniqueId;
+                              const studentDept = departments.find(d => d._id === student.departmentId);
+                              const isCloudVideo = (sub.cameraRecording && sub.cameraRecording.startsWith('/uploads/')) || (sub.screenRecording && sub.screenRecording.startsWith('/uploads/'));
+
+                              return (
+                                <div key={uniqueId} className="border border-slate-100 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-5 transition-all text-right space-y-4">
+                                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div className="space-y-1.5 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-sm font-black text-[#101923]">
+                                          الطالب: {student.fullName.firstName} {student.fullName.lastName}
+                                        </h4>
+                                        <span className="bg-slate-200/70 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-lg font-mono">
+                                          ID: {student.academicId}
+                                        </span>
+                                        {studentDept && (
+                                          <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-lg">
+                                            {studentDept.name}
+                                          </span>
+                                        )}
+                                        {isCloudVideo && (
+                                          <span className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                            تخزين سحابي مباشر ☁️
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs font-semibold text-slate-600">
+                                        الاختبار المقرر: <span className="text-indigo-600 font-extrabold">{exam.courseName}</span> | عنوان الاختبار: <span className="font-bold text-slate-800">{exam.title || 'الاختبار العام'}</span>
+                                      </p>
+                                      <p className="text-[10px] text-slate-400 font-mono">
+                                        تاريخ تقديم الاختبار: {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('ar-EG') : 'غير متوفر'} | النتيجة المحققة: <span className="font-extrabold text-indigo-600">{sub.score} / {exam.maxScore || 100}</span>
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                                      <button
+                                        onClick={() => setOpenProctorVideoId(isExpanded ? null : uniqueId)}
+                                        className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        <span>{isExpanded ? 'إغلاق نافذة العرض' : 'عرض تسجيل المراقبة'}</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => setExamSubmissionGrading({ exam, student, result: sub })}
+                                        className="bg-[#101923] hover:bg-[#1a2c3f] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                      >
+                                        <Award className="h-4 w-4" />
+                                        <span>تقييم وتصحيح الإجابات</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Toggleable video playback stream */}
+                                  {isExpanded && (
+                                    <div className="p-4 bg-[#090f16] text-white rounded-2xl border border-slate-800 space-y-3 animate-fade-in">
+                                      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                          <span className="text-[11px] font-black text-emerald-400">بث تسجيلات جلسة المراقبة الذكية المعتمدة</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-400 font-mono">المعرّف الرقمي للجلسة: PROCTOR-{uniqueId}</span>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                          <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-slate-300 font-bold">بث كاميرا الويب المباشر للطالب:</span>
+                                            {sub.cameraRecording && sub.cameraRecording.startsWith('/uploads/') ? (
+                                              <span className="text-emerald-400 font-black">سحابي حقيقي 🟢</span>
+                                            ) : (
+                                              <span className="text-indigo-400 font-medium">مراقبة افتراضية</span>
+                                            )}
+                                          </div>
+                                          {sub.cameraRecording ? (
+                                            <>
+                                              <video
+                                                src={sub.cameraRecording}
+                                                controls
+                                                playsInline
+                                                className="w-full aspect-video rounded-xl border border-slate-800 bg-black shadow-lg"
+                                              />
+                                              <div className="flex justify-end pt-1">
+                                                <a
+                                                  href={sub.cameraRecording}
+                                                  download={`camera-proctor-${student.academicId || 'student'}.webm`}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="inline-flex items-center gap-1 text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg transition-all"
+                                                >
+                                                  <Download className="h-3 w-3 text-emerald-400" />
+                                                  <span>تنزيل فيديو الكاميرا</span>
+                                                </a>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="w-full aspect-video bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-xs text-slate-500">
+                                              تسجيل الكاميرا غير متوفر
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                          <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-slate-300 font-bold">تسجيل مشاركة الشاشة وبث المتصفح:</span>
+                                            {sub.screenRecording && sub.screenRecording.startsWith('/uploads/') ? (
+                                              <span className="text-emerald-400 font-black">سحابي حقيقي 🟢</span>
+                                            ) : (
+                                              <span className="text-indigo-400 font-medium">مراقبة افتراضية</span>
+                                            )}
+                                          </div>
+                                          {sub.screenRecording ? (
+                                            <>
+                                              <video
+                                                src={sub.screenRecording}
+                                                controls
+                                                playsInline
+                                                className="w-full aspect-video rounded-xl border border-slate-800 bg-black shadow-lg"
+                                              />
+                                              <div className="flex justify-end pt-1">
+                                                <a
+                                                  href={sub.screenRecording}
+                                                  download={`screen-proctor-${student.academicId || 'student'}.webm`}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="inline-flex items-center gap-1 text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg transition-all"
+                                                >
+                                                  <Download className="h-3 w-3 text-emerald-400" />
+                                                  <span>تنزيل فيديو الشاشة</span>
+                                                </a>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="w-full aspect-video bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-xs text-slate-500">
+                                              تسجيل مشاركة الشاشة غير متوفر
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -2576,12 +2816,26 @@ create policy "Allow public access" on lms_data for all using (true) with check 
                   <div className="space-y-1">
                     <span className="text-[10px] text-slate-500 block">بث كاميرا الويب:</span>
                     {examSubmissionGrading.result.cameraRecording ? (
-                      <video
-                        controls
-                        playsInline
-                        className="w-full aspect-video rounded-xl border border-slate-200 bg-black shadow-sm"
-                        src={examSubmissionGrading.result.cameraRecording}
-                      />
+                      <>
+                        <video
+                          controls
+                          playsInline
+                          className="w-full aspect-video rounded-xl border border-slate-200 bg-black shadow-sm"
+                          src={examSubmissionGrading.result.cameraRecording}
+                        />
+                        <div className="flex justify-end pt-1">
+                          <a
+                            href={examSubmissionGrading.result.cameraRecording}
+                            download={`camera-proctor-${examSubmissionGrading.student.academicId || 'student'}.webm`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[9px] text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 px-2 py-1 rounded-lg transition-all shadow-sm font-bold"
+                          >
+                            <Download className="h-2.5 w-2.5 text-emerald-500" />
+                            <span>تنزيل الفيديو</span>
+                          </a>
+                        </div>
+                      </>
                     ) : (
                       <div className="w-full aspect-video bg-slate-200 rounded-xl flex items-center justify-center text-[9px] text-slate-400">غير متوفر</div>
                     )}
@@ -2589,12 +2843,26 @@ create policy "Allow public access" on lms_data for all using (true) with check 
                   <div className="space-y-1">
                     <span className="text-[10px] text-slate-500 block">لقطة الشاشة الحية:</span>
                     {examSubmissionGrading.result.screenRecording ? (
-                      <video
-                        controls
-                        playsInline
-                        className="w-full aspect-video rounded-xl border border-slate-200 bg-black shadow-sm"
-                        src={examSubmissionGrading.result.screenRecording}
-                      />
+                      <>
+                        <video
+                          controls
+                          playsInline
+                          className="w-full aspect-video rounded-xl border border-slate-200 bg-black shadow-sm"
+                          src={examSubmissionGrading.result.screenRecording}
+                        />
+                        <div className="flex justify-end pt-1">
+                          <a
+                            href={examSubmissionGrading.result.screenRecording}
+                            download={`screen-proctor-${examSubmissionGrading.student.academicId || 'student'}.webm`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[9px] text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 px-2 py-1 rounded-lg transition-all shadow-sm font-bold"
+                          >
+                            <Download className="h-2.5 w-2.5 text-emerald-500" />
+                            <span>تنزيل الفيديو</span>
+                          </a>
+                        </div>
+                      </>
                     ) : (
                       <div className="w-full aspect-video bg-slate-200 rounded-xl flex items-center justify-center text-[9px] text-slate-400">غير متوفر</div>
                     )}
